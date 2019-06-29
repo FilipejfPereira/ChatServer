@@ -27,14 +27,18 @@ public class ServerWorker implements Runnable {
 
                 out = new DataOutputStream(clientSocket.getOutputStream());
                 BufferedReader bReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                String msg = bReader.readLine();
+                //String msg = bReader.readLine();
+                String msg;
+                while((msg = bReader.readLine()) != null){
+                        if(msg.equalsIgnoreCase("/quit")){
 
+                            break;
+                        }
+                        s = (msg + "\n");
+                        messageToSent = true;
 
-
-                if(msg !=null) {
-                    s = (msg + "\n");
-                   messageToSent = true;
                 }
+                clientSocket.close();
             }
         } catch (SocketException s) {
             System.out.println("Connection closed");
@@ -64,4 +68,7 @@ public class ServerWorker implements Runnable {
     public Socket getClientSocket() {
         return clientSocket;
     }
+
+
+
 }
