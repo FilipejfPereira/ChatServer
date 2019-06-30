@@ -53,6 +53,7 @@ public class ServerWorker implements Runnable {
                             messageToSend = (msg + "\n");
                             messageToSent = true;
                         }
+
                 }
                 clientSocket.close();
             }
