@@ -3,7 +3,8 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.ArrayList;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Vector;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -11,12 +12,12 @@ import java.util.concurrent.Executors;
 public class ChatServer {
 
     private ServerSocket server;
-    private Socket clientsocket;
-    private ArrayList<ServerWorker> arrayWorkers;
+    private Vector<ServerWorker> arrayWorkers;
     private ExecutorService cashedPool;
     private ExecutorService broadcastPool;
     private ExecutorService terminatePool;
     private int numberOfClient = 1;
+    private SimpleDateFormat sdf = new SimpleDateFormat(" HH:mm"); //REPRESENT THE TIME OF THE MESSAGE
 
     public ChatServer() {
         try {
@@ -24,7 +25,7 @@ public class ChatServer {
             cashedPool = Executors.newCachedThreadPool();
             broadcastPool = Executors.newSingleThreadExecutor();
             terminatePool = Executors.newSingleThreadExecutor();
-            arrayWorkers = new ArrayList<>();
+            arrayWorkers = new Vector<>();
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -34,26 +35,17 @@ public class ChatServer {
 
     public void acceptConnection() {
         try {
+            Broadcast broadcast = new Broadcast();
+
+            Terminated terminated = new Terminated();
             while (true) {
-                clientsocket = server.accept();
+                Socket clientsocket = server.accept();
 
-                String clientName = "client " + numberOfClient;
-
-                numberOfClient++;
-
-                Client client = new Client();
-
-                ServerWorker sWorker = new ServerWorker(clientsocket, client, clientName);
-
-                Broadcast broadcast = new Broadcast();
-
-                Terminated terminated = new Terminated();
+                ServerWorker sWorker = newServerWorker(clientsocket);
 
                 arrayWorkers.add(sWorker);
-                cashedPool.submit(sWorker);
-                broadcastPool.submit(broadcast);
-                terminatePool.submit(terminated);
 
+                threadPoolInitializer(broadcast, terminated, sWorker);
 
             }
         } catch (IOException e) {
@@ -64,11 +56,21 @@ public class ChatServer {
 
 
 
+    private void threadPoolInitializer(Broadcast broadcast, Terminated terminated, ServerWorker sWorker) {
+        cashedPool.submit(sWorker);
+        broadcastPool.submit(broadcast);
+        terminatePool.submit(terminated);
+    }
 
+    private ServerWorker newServerWorker(Socket clientsocket) {
+        String clientName = "client " + numberOfClient;
 
+        numberOfClient++;
 
+        Client client = new Client();
 
-
+        return new ServerWorker(clientsocket, client, clientName);
+    }
 
 
 
@@ -80,57 +82,53 @@ public class ChatServer {
         public synchronized void broadcastMessage()  {
 
             while (true) {
+                try {
+                    for (int i = 0; i < arrayWorkers.size(); i++) {
 
-                for (int i = 0; i < arrayWorkers.size(); i++) {
+                        if ((arrayWorkers.get(i)).isMessageToSent()) {
 
-                    if ((arrayWorkers.get(i)).isMessageToSent()) {
+                            if (arrayWorkers.get(i).getMessageToSend().contains("/alias")) {
 
-                        if (arrayWorkers.get(i).getMessageToSend().contains("/alias")) {
+                                changeAlias(i);
+                                arrayWorkers.get(i).setMessageToSent(false);
 
-                            changeName(i);
-                            arrayWorkers.get(i).setMessageToSent(false);
+                                break;
 
-                            break;
-
-                        }else if (arrayWorkers.get(i).getMessageToSend().contains("/list")) {
-
-                            try {
+                            } else if (arrayWorkers.get(i).getMessageToSend().contains("/list")) {
 
                                 getListOfNames(i);
                                 arrayWorkers.get(i).setMessageToSent(false);
+
                                 break;
 
-                            } catch (IOException e) {
-                                e.printStackTrace();
+                            } else if (arrayWorkers.get(i).getMessageToSend().contains("/quit")) {
+                                terminateConnection(i);
+
                             }
+                            for (int j = 0; j < arrayWorkers.size(); j++) {
 
+                                //if (i != j) {
+
+                                sendMessage(i, j);
+                                System.out.println("Message was sent");
+                                arrayWorkers.get(i).setMessageToSent(false);
+
+                            }
                         }
-                        for (int j = 0; j < arrayWorkers.size(); j++) {
-
-                            if (i != j) {
-
-                                try {
-
-                                    sendMessage(i, j);
-                                    System.out.println("1");
-                                } catch (SocketException ignored) {
-
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }
-                           }
-                        }
-                        System.out.println("2");
-                        arrayWorkers.get(i).setMessageToSent(false);
-
                     }
+                }catch(SocketException s){
 
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
-        }
+
+                }
+            //}
 
 
-        public synchronized void changeName(int i) {
+
+        public synchronized void changeAlias(int i) {
 
                 String[] changename = arrayWorkers.get(i).getMessageToSend().split(" ");
                 if(changename[1] != null) {
@@ -156,10 +154,22 @@ public class ChatServer {
 
         }
 
+        public synchronized void terminateConnection(int i) {
+            while (true) {
+
+                    if (arrayWorkers.get(i).getClientSocket().isClosed()) {
+                        System.out.println("removed client");
+                        arrayWorkers.remove(i);
+                        numberOfClient--;
+                    }
+
+            }
+        }
+
 
         public synchronized void sendMessage(int i, int j) throws IOException {
             DataOutputStream out = new DataOutputStream(arrayWorkers.get(j).getClientSocket().getOutputStream());
-            out.writeBytes(arrayWorkers.get(i).getName() + ": " + arrayWorkers.get(i).getMessageToSend());
+            out.writeBytes("\n" + arrayWorkers.get(i).getName() + " " + sdf.format(new Date()) + ": " + arrayWorkers.get(i).getMessageToSend());
             arrayWorkers.get(i).setMessageToSent(false);
         }
 

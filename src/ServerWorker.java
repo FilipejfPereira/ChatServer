@@ -35,23 +35,27 @@ public class ServerWorker implements Runnable {
 
                 while((msg = bReader.readLine()) != null){
 
-
                         if(msg.equalsIgnoreCase("/quit")){
                             out.writeBytes("You have been disconnected from server");
 
                             break;
                         }
+
                         if(msg.contains("/alias")){
-                            messageToSend = msg;
-                            messageToSent = true;
-                        }else if(msg.contains("/list")){
+
                             messageToSend = msg;
                             messageToSent = true;
 
+                        }else if(msg.contains("/list")){
+
+                            messageToSend = msg;
+                            messageToSent = true;
 
                         } else {
+
                             messageToSend = (msg + "\n");
                             messageToSent = true;
+
                         }
 
                 }
